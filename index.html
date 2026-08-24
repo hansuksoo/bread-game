@@ -188,10 +188,15 @@
       📱 모바일: 화면 버튼<br>
       💻 PC: 방향키 + 스페이스바
     </div>
+    <div style="font-size: 16px; margin-bottom: 8px; color: #ffd966;">닉네임 (선택)</div>
+    <input id="start-nickname" type="text" maxlength="10" placeholder="이름 또는 별명" autocomplete="off"
+           style="width: 220px; padding: 8px 12px; font-size: 16px; text-align: center;
+                  border: 2px solid #444; border-radius: 8px; background: #1a1a22; color: white;
+                  font-family: inherit; margin-bottom: 16px;">
     <div style="font-size: 16px; margin-bottom: 10px; color: #ffd966;">난이도 선택</div>
     <div class="diff-buttons">
       <button class="diff-btn diff-normal" data-diff="normal">
-        🟢 보통<br><span class="diff-info">65초 · 마지막 복도에 추적형!</span>
+        🟢 보통<br><span class="diff-info">60초 · 마지막 복도에 추적형!</span>
       </button>
       <button class="diff-btn diff-impossible" data-diff="impossible">
         🔴 불가능<br><span class="diff-info">35초 · 400명 중 10명만 클리어</span>
@@ -518,15 +523,15 @@ const STAGE_BASE = [
 const DIFFICULTIES = {
   normal: {
     label: "🟢 보통",
-    startTime: 65.0,
+    startTime: 60.0,
     // 각 스테이지의 (선생님 수, 속도, 추적형 수)
     stages: [
-      { teachers: 0, tspeed: 0, chase: 0 },  // 1. 교실
-      { teachers: 2, tspeed: 2, chase: 0 },  // 2. 복도
-      { teachers: 2, tspeed: 2, chase: 0 },  // 3. 계단 위
+      { teachers: 1, tspeed: 0, chase: 0 },  // 1. 교실
+      { teachers: 2, tspeed: 3, chase: 0 },  // 2. 복도
+      { teachers: 2, tspeed: 3, chase: 0 },  // 3. 계단 위
       { teachers: 0, tspeed: 0, chase: 0 },  // 4. 매점
-      { teachers: 2, tspeed: 2, chase: 0 },  // 5. 계단 아래
-      { teachers: 3, tspeed: 3, chase: 1 },  // 6. 복도 (추적형 1명!)
+      { teachers: 2, tspeed: 3, chase: 0 },  // 5. 계단 아래
+      { teachers: 3, tspeed: 4, chase: 1 },  // 6. 복도 (추적형 1명!)
       { teachers: 0, tspeed: 0, chase: 0 },  // 7. 교실 도착
     ],
   },
@@ -535,11 +540,11 @@ const DIFFICULTIES = {
     startTime: 35.0,
     stages: [
       { teachers: 0, tspeed: 0, chase: 0 },
-      { teachers: 3, tspeed: 4, chase: 1 },  // 추적형 1명 + 일반 2명
-      { teachers: 3, tspeed: 4, chase: 1 },  // 계단도 동일
+      { teachers: 4, tspeed: 4, chase: 1 },  // 추적형 1명 + 일반 2명
+      { teachers: 4, tspeed: 5, chase: 1 },  // 계단도 동일
       { teachers: 0, tspeed: 0, chase: 0 },
-      { teachers: 3, tspeed: 4, chase: 2 },  // 추적형 2명 + 일반 1명
-      { teachers: 4, tspeed: 5, chase: 1 },  // 최후의 관문 (추적형 1명으로 완화)
+      { teachers: 4, tspeed: 5, chase: 1 },  // 추적형 2명 + 일반 1명
+      { teachers: 4, tspeed: 5, chase: 2 },  // 최후의 관문 (추적형 1명으로 완화)
       { teachers: 0, tspeed: 0, chase: 0 },
     ],
   },
@@ -964,12 +969,14 @@ function loadScores() {
   } catch (e) { return []; }
 }
 
-function saveScore(clearTime) {
+function saveScore(clearTime, nickname) {
   const scores = loadScores();
   const now = new Date();
   const pad = (n) => String(n).padStart(2, "0");
   const date = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-  scores.push({ time: Math.round(clearTime * 100) / 100, date });
+  // 닉네임 정리: 너무 길면 자르고, 비어있으면 "익명"
+  const safeName = (nickname && nickname.trim()) ? nickname.trim().slice(0, 10) : "익명";
+  scores.push({ time: Math.round(clearTime * 100) / 100, date, name: safeName });
   scores.sort((a, b) => a.time - b.time);
   const top10 = scores.slice(0, 10);
   try { localStorage.setItem(getScoreKey(), JSON.stringify(top10)); } catch (e) {}
@@ -978,7 +985,9 @@ function saveScore(clearTime) {
 
 function getRank(clearTime, scores) {
   const target = Math.round(clearTime * 100) / 100;
-  for (let i = 0; i < Math.min(3, scores.length); i++) {
+  // 불가능 모드는 TOP 5, 보통 모드는 TOP 3까지 새 기록으로 인정
+  const topCount = (currentDifficulty === "impossible") ? 5 : 3;
+  for (let i = 0; i < Math.min(topCount, scores.length); i++) {
     if (Math.abs(scores[i].time - target) < 0.01) return i + 1;
   }
   return 0;
@@ -988,6 +997,8 @@ function newGame() {
   const p = new Player();
   p.setArea(getPlayArea(0));
   p.resetToLeft();
+  // 이전 게임에서 사용한 닉네임을 localStorage에서 불러옴 (재시작 시 유지)
+  const savedNick = localStorage.getItem("breadGameNickname") || "";
   return {
     player: p, stageIdx: 0,
     teachers: makeTeachers(0),
@@ -998,6 +1009,7 @@ function newGame() {
     clearTime: null, scores: [], newRank: 0,
     shopBoxes: [], boxCooldown: 0,
     endingPhase: 0, endingTimer: 0,
+    nickname: savedNick,
   };
 }
 
@@ -1008,7 +1020,7 @@ function goNextStage(state) {
     state.win = true; state.gameOver = true;
     const clearTime = getStartTime() - state.timeLeft;
     state.clearTime = clearTime;
-    state.scores = saveScore(clearTime);
+    state.scores = saveScore(clearTime, state.nickname);
     state.newRank = getRank(clearTime, state.scores);
     state.message = state.newRank > 0
       ? `🏆 TOP ${state.newRank} 기록!`
@@ -1286,32 +1298,41 @@ function render() {
                    W/2, 190, 36, C.YELLOW, true);
 
           if (state.newRank > 0) {
-            const medals = ["🥇", "🥈", "🥉"];
+            const medals = ["🥇", "🥈", "🥉", "🏅", "🏅"];  // 4, 5위는 일반 메달
             drawText(`${medals[state.newRank-1]} 새 TOP ${state.newRank} 기록!`,
                      W/2, 235, 32, C.ORANGE, true);
           }
 
-          const boxX = W/2 - 200, boxY = 285, boxW = 400, boxH = 210;
-          roundRect(boxX, boxY, boxW, boxH, 10, "rgba(40,40,50,0.95)", C.YELLOW, 3);
+          // 난이도에 따라 TOP 개수 다르게 (불가능은 TOP 5, 보통은 TOP 3)
+          const topCount = (currentDifficulty === "impossible") ? 5 : 3;
+          const rowGap = (topCount === 5) ? 36 : 45;  // 5개면 행 간격 좁힘
+          const boxH_dynamic = 60 + topCount * rowGap;
+          const boxX = W/2 - 250, boxY = 285, boxW = 500;
+          roundRect(boxX, boxY, boxW, boxH_dynamic, 10, "rgba(40,40,50,0.95)", C.YELLOW, 3);
 
           ctx.textAlign = "center"; ctx.textBaseline = "middle";
-          drawText("🏆 TOP 3 기록", W/2, boxY + 25, 22, C.YELLOW, true);
+          drawText(`🏆 TOP ${topCount} 기록`, W/2, boxY + 25, 22, C.YELLOW, true);
 
-          const medalsLabel = ["1위 🥇", "2위 🥈", "3위 🥉"];
-          const top3 = state.scores.slice(0, 3);
-          for (let i = 0; i < 3; i++) {
-            const rowY = boxY + 70 + i * 45;
-            if (i < top3.length) {
-              const s = top3[i];
+          // 메달은 1~3위만, 4~5위는 숫자
+          const medalsLabel = ["1위 🥇", "2위 🥈", "3위 🥉", "4위", "5위"];
+          const topList = state.scores.slice(0, topCount);
+          for (let i = 0; i < topCount; i++) {
+            const rowY = boxY + 60 + i * rowGap;
+            if (i < topList.length) {
+              const s = topList[i];
               const isNew = (state.newRank === i + 1);
               const color = isNew ? C.ORANGE : C.WHITE;
+              const name = s.name || "익명";  // 옛날 기록은 name 없을 수 있음
+              const fontSize = (topCount === 5) ? 19 : 22;
               ctx.textAlign = "left";
-              drawText(medalsLabel[i], boxX + 20, rowY, 22, color);
-              drawText(`${s.time.toFixed(2)}초`, boxX + 130, rowY, 22, color);
-              drawText(s.date, boxX + 240, rowY, 16, isNew ? C.ORANGE : "#aaaaaa");
+              drawText(medalsLabel[i], boxX + 20, rowY, fontSize, color);
+              drawText(name, boxX + 130, rowY, fontSize - 2, color);
+              drawText(`${s.time.toFixed(2)}초`, boxX + 280, rowY, fontSize, color, true);
+              drawText(s.date.slice(5), boxX + 390, rowY, 14, isNew ? C.ORANGE : "#aaaaaa");
             } else {
+              const fontSize = (topCount === 5) ? 19 : 22;
               ctx.textAlign = "left";
-              drawText(`${medalsLabel[i]}  - - -`, boxX + 20, rowY, 22, "#888888");
+              drawText(`${medalsLabel[i]}  - - -`, boxX + 20, rowY, fontSize, "#888888");
             }
           }
         }
@@ -1456,21 +1477,31 @@ function hideHall() {
 document.querySelectorAll(".diff-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     const diff = btn.dataset.diff;
-    // 축제 모드 + 불가능 난이도면 닉네임 입력 화면
+    // 시작 화면의 닉네임 입력란에서 닉네임 가져오기
+    const nickInput = document.getElementById("start-nickname");
+    const enteredNick = (nickInput && nickInput.value) ? nickInput.value.trim().slice(0, 10) : "";
+    // 닉네임 저장 (다음번 재시작 시 재사용)
+    if (enteredNick) {
+      localStorage.setItem("breadGameNickname", enteredNick);
+    } else {
+      localStorage.removeItem("breadGameNickname");
+    }
+    // 축제 모드 + 불가능 난이도면 별도 닉네임 입력 화면 (기존 축제 모드 호환)
     if (festivalMode && diff === "impossible") {
       showNicknameScreen(diff);
       return;
     }
-    // 그 외에는 바로 게임 시작
+    // 일반 시작
     applyDifficulty(diff);
     state = newGame();
+    state.nickname = enteredNick;  // 게임에 닉네임 적용
     document.getElementById("start-hint").style.display = "none";
     if (isTouchDevice()) document.getElementById("controls").classList.add("show");
     resizeCanvas();
     started = true;
     lastTime = performance.now();
     wasGameOver = false;
-    currentNickname = "";  // 일반 모드는 닉네임 없음
+    currentNickname = enteredNick;
   });
 });
 
@@ -1553,6 +1584,12 @@ if (urlParams.has("admin")) {
 
 setupMobileControls();
 resizeCanvas();
+// 시작 화면 닉네임 입력란에 이전 닉네임 자동 채우기
+const savedStartNick = localStorage.getItem("breadGameNickname");
+if (savedStartNick) {
+  const startNickInput = document.getElementById("start-nickname");
+  if (startNickInput) startNickInput.value = savedStartNick;
+}
 render();
 requestAnimationFrame(festivalLoop);
 </script>
