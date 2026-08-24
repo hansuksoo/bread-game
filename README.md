@@ -15,7 +15,7 @@ PC(방향키 + 스페이스바)와 모바일(터치 버튼) 모두 지원합니�
 빌드 단계가 없는 정적 사이트입니다.
 
 - **GitHub Pages** — https://hansuksoo.github.io/bread-game/ (2·3편은 `/mario.html`, `/sonic.html`)
-- **Vercel** — `vercel.json`의 `cleanUrls` 덕분에 `/mario`, `/sonic` 으로 접속됩니다 (Framework Preset: Other)
+- **Vercel** — https://breads.vercel.app/ (`cleanUrls` 적용으로 `/mario`, `/sonic` 으로 접속)
 
 ## 로컬 실행
 
