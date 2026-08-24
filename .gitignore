@@ -1,0 +1,5 @@
+# 배포 대상 아님 — 로컬 보관용
+# pygame 원본 (데스크톱 전용, 서버에서 실행 불가)
+bread_game.py
+# 1편 초기 웹 포팅 (index.html 로 대체됨)
+bread_game.html
